@@ -1,0 +1,7 @@
+# Dependencies
+torch
+matplotlib
+sklearn
+pandas
+numpy
+tensorboard
