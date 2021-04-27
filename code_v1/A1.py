@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[82]:
+# In[1]:
 
 
 import torch
@@ -22,7 +22,7 @@ import math
 # - Multip_layer: three layer network, the hidden layer size could be modified
 # - get_overall_accuray, get_class_wise_accuracy: function to get accuracy
 
-# In[2]:
+# In[4]:
 
 
 """
@@ -30,16 +30,12 @@ Fist step load data from xlsx
 """
 def csv2dataset(path='data/SFEW.xlsx'):
     exl = pd.read_excel(path)
-    header = exl.columns
-    idx_header = range(2,12)
+    exl.dropna(inplace=True)
 
-    pca = exl[header[idx_header]].values
-    pca = np.delete(pca, (205), axis=0)  # remove row 205 which contains nan value
-    target = exl[header[1]].values
-    target = np.delete(target, (205), axis=0)
+    pca = exl.iloc[:, 2:].values
+    target = exl.iloc[:, 1].values
 
     input_tensor = torch.tensor(pca, dtype=torch.float32)
-    # transform target [1, 7] -> [0, 6]
     target_tensor = torch.tensor(target, dtype=torch.long) - 1
 
     # apply normalization
@@ -52,7 +48,7 @@ def csv2dataset(path='data/SFEW.xlsx'):
     return dataset
 
 
-# In[227]:
+# In[9]:
 
 
 class Multi_layer(nn.Module):
@@ -71,9 +67,7 @@ class Multi_layer(nn.Module):
             current_size = n_hidden
         layers['fc_out'] = nn.Linear(current_size, n_class)
         # layers['softmax_out'] = nn.Softmax(dim=1)
-
         self.model = nn.Sequential(layers)
-#         print(self.model)
 
     def forward(self, x):
         x = self.model.forward(x)
@@ -89,7 +83,7 @@ def reset_weights(m):
             layer.reset_parameters
 
 
-# In[282]:
+# In[10]:
 
 
 def get_overall_accuracy(model, dataLoader):
@@ -97,7 +91,6 @@ def get_overall_accuracy(model, dataLoader):
     total = 0
 
     for _, (pca, target) in enumerate(dataLoader, 0):
-#         pca, target = pca.cuda(), target.cuda()
         outputs = model(pca)
         _, predicted = torch.max(outputs, dim=1)
         total += target.size(0)
@@ -124,7 +117,7 @@ def get_class_wise_accuracy(model, dataLoader, n_class=7):
 # ## Define the hyper-parameters
 # Also save the parameters of kfold id for the later test and retraining
 
-# In[ ]:
+# In[23]:
 
 
 # hyper-parameters
@@ -132,16 +125,19 @@ batch_size = 16
 learning_rate = 1e-4
 epoches = 4000
 k_fold = 5
-hidden = [64]
-dev = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+hidden = [128]
+
 torch.manual_seed(5)
-print(dev)
+random.seed(5)
+np.random.seed(5)
+criterion = nn.CrossEntropyLoss()
 
 
-# In[97]:
+# In[22]:
 
 
 # Define the k-fold cross validator
+dataset = csv2dataset()
 kfold = KFold(n_splits=k_fold, shuffle=True)
 
 # save the training ids for the later experiences
@@ -150,14 +146,7 @@ for fold, ids in enumerate(kfold.split(dataset)):
     fold_ids[fold] = ids
 
 
-# In[ ]:
-
-
-criterion = nn.CrossEntropyLoss()
-dataset = csv2dataset()
-
-
-# ##### Training script
+# #### Training script
 # 
 # - Use the tensorboard to record the accuracy and loss during the training
 # 
@@ -170,12 +159,6 @@ dataset = csv2dataset()
 
 s = '1_SFEW_h128_b16_lr4_ep4000'
 writer = SummaryWriter('runs/' + s)
-
-# define list to store results through training process
-train_losses = []
-
-# define class-wise AC dict, record cw_ac for each fold, and 
-cw_ac_dict = {}
 
 # K-fold cross validation model evaluation
 for fold, (train_ids, test_ids) in fold_ids.items():
@@ -195,7 +178,7 @@ for fold, (train_ids, test_ids) in fold_ids.items():
         )
 
     # initial model
-    model = Multi_layer(10, [128], 7).to(dev)
+    model = Multi_layer(10, hidden, 7)
     model.apply(reset_weights)
 #     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -208,8 +191,6 @@ for fold, (train_ids, test_ids) in fold_ids.items():
 
         for i, data in enumerate(trainloader, start=0):
             inputs, targets = data
-#             inputs, targets = inputs.cuda(), targets.cuda()
-
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -281,7 +262,6 @@ path_set = {
     '2_SFEW_h64_b16_lr4_ep4000': [64],    
     '1_SFEW_h128_b16_lr4_ep4000': [128]
 }
-type(path_set)
 
 
 # In[431]:
@@ -539,9 +519,7 @@ for path in path_set:
                 i2j[i] = {j}
                 j2i[j] = i
             else:
-                i2j[j2i[j]].add(j)
-        
-                    
+                i2j[j2i[j]].add(j)    
         elif i in i2j.keys():
             i2j[i].add(j)
             j2i[j] = i
