@@ -2,7 +2,7 @@
 
 This project aims to see the performance by using *Distinctiveness* to pruning on the 3-layers neural networks. 
 - Dataset: SFEW. 
-- See the report in `paper_v1`. 
+- See the report in `paper_v2`. 
 
 ## Files
 - code_v1: contain the experience jupyter notebook `A1.ipynb`, and the export py file `A1.py`
